@@ -1,7 +1,3 @@
-#include <ddraw.h>
-#pragma comment ( lib, "ddraw.lib" ) //ddraw.lib´Â 2010 ³â ¹öÀü sdkÀÌÇÏ¿¡¼­¸¸ Á¸ÀçÇÏ¿© »õ·Î ±¸¹öÀüÀ» ´Ù¿î¹Ş¾Æ¾ß ½ÇÇàµÊ.
-#pragma comment ( lib, "dxguid.lib" )
-
 #include <iostream>
 #include <windows.h>
 #include <fstream>
@@ -10,378 +6,54 @@ using namespace std;
 
 
 #define WIDTH 2560	
-#define HEIGHT 1600 // ³ªÁß¿¡ ÀÌ¸§ ±×´ë·Î Å¬·¡½º º¯¼ö·Î ¹Ù²Ù¾î ÁÖ¾î¾ß ÇÔ. °øÀ¯¿Í ÈÄÀÇ º¯°æÀ» À§ÇØ
+#define HEIGHT 1600 // ë‚˜ì¤‘ì— ì´ë¦„ ê·¸ëŒ€ë¡œ í´ë˜ìŠ¤ ë³€ìˆ˜ë¡œ ë°”ê¾¸ì–´ ì£¼ì–´ì•¼ í•¨. ê³µìœ ì™€ í›„ì˜ ë³€ê²½ì„ ìœ„í•´
 #define FRAME 301
 
-#define IS10BIT true //¼öÁ¤ 10bit 
-//¾ÕÀ¸·Î 10ºñÆ® ¿µ»ó È°¿ëºĞ¿¡´Â ³»°¡ #if IS10BIT¸¦ Áı¾î ³ÖÀ»°Çµ¥,
-//10ºñÆ® ¿µ»óÀ» Àç»ıÇÏ´Â °æ¿ì°¡ ¸¹Áö ¾Ê°í, ³»°¡ »ı¼ºÀÚ¿Í ¼Ò¸êÀÚ¿¡ #if¸¦ È°¿ëÇØ¼­ 10ºñÆ®¸¦ »ç¿ëÇÏÁö ¾ÊÀ»¶§´Â ¾Æ¿¹
-//¼±¾ğÀÌ³ª ÇÏÁö ¾Êµµ·Ï ¸¸µé¾ú±â ¶§¹®¿¡ °ø°£ Àı¾àÀÌ µÉ°Å °°¾Æ.
-//10ºñÆ® YUV ¿µ»ó ±¸Á¶´Â ¹Ø¿¡ ´Ş¾Æ µÎ¾ú¾î.
-//10ºñÆ® È°¿ëÇÑ ºÎºĞÀº ¹Ù·Î ¹Ø¿¡ ±¸Á¶Ã¼ »ı¼º, »ı¼ºÀÚ¿Í ¼Ò¸êÀÚ, ±×¸®°í ¿µ»ó Load ÇÏ´Â ºÎºĞ¸¸ ¼öÁ¤ÇÏ¸é µÇ°Ô Á¤¸® ÇØ µÎ¾ú¾î.
+#define IS10BIT true //ìˆ˜ì • 10bit 
 
 typedef struct TenBitYUV_Str{
 	UCHAR *data[3];
 } TENBITYUV_STR;
-//¼öÁ¤ 10bit ³¡
+//ìˆ˜ì • 10bit ë
 
 static int Frame = 0;
 static int FilePointer = 0;
-
-
-
-typedef struct AVFrame{ // www.ffmpeg.org/doxygen/
-	UCHAR *data[3]; //Y,U,V plane pointer (uint8_t *data[AV_NUM_DATA_POINTERS])
-	int linesize [3]; //Y,U,V size size in bytes of each picture line
-} AVFrame;
-
-
-
-
-LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam); 
-//¾ê´Â ¹«Á¶°Ç Àü¿ªÀ¸·Î »©¾ßÇÔ. ¾îÂîµÈ°ÇÁö, ¸ŞÀÎÇÔ¼ö¿¡¼­ ¸ÔÈ÷Áú ¾ÊÀ½. ¾îÂ¼¸é MFC¿¡¼­´Â ¹«°üÇÒÁöµµ.
-
-#if IS10BIT == TRUE 
-
-	TENBITYUV_STR *tempAVFrame; //Àü¿ªº¯¼ö·Î ¼±¾ğÇØ¾ßÁö¸¸ mainÇÔ¼ö »ı¼ºÀÚ¿¡¼­ ¼±¾ğÇÏ°í ¼Ò¸êÀÚ¿¡¼­ delete[] °¡ °¡´É
-
-#endif
-AVFrame *YUVdata;  //YUV µ¥ÀÌÅÍ¸¦ ´ãÀ» ¹è¿­°ú
-RECT rectTarget;   //YUV µ¥ÀÌÅÍÀÇ ÃÊ±âÁ¡(x,y), °¡·Î, ¼¼·Î ³×°³ÀÇ µ¥ÀÌÅÍ °ªÀÇ ÀúÀå¼Ò
-
-DDPIXELFORMAT g_ddpfFormats[] ={{sizeof(DDPIXELFORMAT), DDPF_FOURCC,MAKEFOURCC('Y','V','1','2'),0,0,0,0,0}};
-AVFrame* YUVCreate(AVFrame *YUVdata);				//AVFrame memory create for YUVData
-
-
-class CDDMain{
-public:
-	CDDMain();
-	 ~CDDMain();
-	int g_width, g_height;
-
-	IDirectDrawClipper *lpClipper;
-	//LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam); 
-	int initDraw(HWND hWnd, int width, int height);		// YUV Surface »ı¼º directDraw Ç¥¸é »ı¼º
-	int draw(RECT *rectTarget, AVFrame *pPicture);
-	void   DelObjects();								//Surface Del
-	int YUVLoad(AVFrame *YUVdata);						//YUV DataLoad
-	void YUVDel(AVFrame *YUVdata);						//YUVdata free()
+		 
+int main(){
 	
-	LPDIRECTDRAW7 pDD;							//DirectDrawÀÇ °´Ã¼¼±¾ğ
-	LPDIRECTDRAWSURFACE7  lpPrimary;		//ÁÖÇ¥¸é
-	LPDIRECTDRAWSURFACE7  lpYUVBuffer;			//º¸Á¶Ç¥¸é
- 
-	LPSTR lpClassName;						//À©µµ¿ì ÀÌ¸§
-};
-
-
-
-CDDMain::CDDMain(){
-	pDD = NULL;							//DirectDrawÀÇ °´Ã¼¼±¾ğ
-	lpPrimary     = NULL ;		//ÁÖÇ¥¸é
-	lpYUVBuffer = NULL ;			//º¸Á¶Ç¥¸é
-	lpClassName  = "YUV_TEST";						//À©µµ¿ì ÀÌ¸§
-	
-	//¼öÁ¤ 10bit
 #if IS10BIT == TRUE
-
-	tempAVFrame = new (TENBITYUV_STR);
-	 
-	tempAVFrame->data[0] = new UCHAR[WIDTH*HEIGHT * 2];		//Y
-	tempAVFrame->data[1] = new UCHAR[WIDTH*HEIGHT/4 * 2];	//U 
-	tempAVFrame->data[2] = new UCHAR[WIDTH*HEIGHT/4 * 2];	//V  
-	//ÀÏ´Ü int Çü typeÀÇ µ¥ÀÌÅÍ¸¦ ¼±¾ğÇÏ¿© 10ºñÆ®Â¥¸® ³ÖÀ» ÁØºñ¸¦ ÇÔ. (16ºñÆ® ±¸Á¶Ã¼ short)
-
-#endif
-	//¼öÁ¤ 10bit ³¡
-	
-}
-CDDMain::~CDDMain(){	//Terminate¸¦ ¿©±â¼­½ÃÄÑÁÖ³ª? ¤»¤»
-	//¼öÁ¤ 10bit 
-#if IS10BIT == TRUE
-	delete [](tempAVFrame->data[0]);
-	delete [](tempAVFrame->data[1]);
-	delete [](tempAVFrame->data[2]);
-
-	delete [](tempAVFrame);
-#endif
-	//¼öÁ¤ 10bit ³¡
-}
-
-LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam){
-	switch(msg)
-    {
-     case WM_KEYDOWN:
-           switch(LOWORD(wParam))
-          {
-              //ESCÅ°°¡ ´­¸®¸é Á¾·á¸Ş½ÃÁö¸¦ º¸³½´Ù.
-              case VK_ESCAPE:  
-                   PostMessage(hWnd, WM_QUIT, 0, 0);
-                   break;
-           }
-           return 0;
-    case WM_DESTROY:
-          PostQuitMessage(0);
-          return 0;
-     }
-    return DefWindowProc(hWnd, msg, wParam, lParam); 
-}
-
-
-
-int CDDMain::initDraw(HWND hWnd, int width, int height){
-
-	 HRESULT hr;
-
-	g_width = width;
-	g_height = height;
-
-
-
-	hr = DirectDrawCreateEx(NULL, (void **)&pDD, IID_IDirectDraw7, NULL);	
-
-	//¾Æ·¡ ¹®Àå°ú ¼¼Æ®
-	if (FAILED(hr)) {
-	 printf("failed to create directdraw device (hr:0x%x)\n", hr);
-	 return -1;
-	}
-
-
-
-	hr = pDD->SetCooperativeLevel(hWnd, DDSCL_NORMAL);	//ÇØ´ç µğ¹ÙÀÌ½ºÀÇ ¿¢¼¼½º ±ÇÇÑÀ» ¼³Á¤ÇÑ´Ù. ³ªÁß¿¡ ¹é±×¶ó¿îµå ´ÙÀÌ¾ó·Î±× ÀÛµ¿½ÃÅ³¶§ ÇÊ¿äÇÒµí
-	//³Ê¹«»¡¶ó Å×½ºÆ®ÇÒ ¼ö ¾ø¾úÀ¸³ª --;; DDSCL_NOWINDOWCHANGES´Â directdraw¿¡ ÀÇÇØ µ¿ÀÛÇÏ´Â°æ¿ì APP À©µµ¿ìÀÇ ÃÖ¼ÒÈ­, º¹¿øÀ» Çã°¡ÇÏÁö ¾ÊÀ½
-
-	if(FAILED(hr)) {
-	 printf("failed to SetCooperativeLevel (hr:0x%x)\n", hr);
-	 return -1;
-	}
-
-
-	DDSURFACEDESC2 ddsd;
-
-	 /* creating primary surface (RGB32) */
-	ZeroMemory( &ddsd, sizeof( ddsd ) );
-	ddsd.dwSize         = sizeof( ddsd );
-	ddsd.dwFlags        = DDSD_CAPS;
-	ddsd.ddsCaps.dwCaps = DDSCAPS_PRIMARYSURFACE;
-
-	if (hr=pDD->CreateSurface(&ddsd, &lpPrimary, NULL ) != DD_OK)
-	 {  
-	 printf("failed to create create primary surface (hr:0x%x)\n", hr);
-			 return -1;
-	 }
-
-	/* creating clipper */
-	hr = pDD->CreateClipper(0, &lpClipper, NULL);
-
-	if (hr != DD_OK)
-	{
-	 printf("failed to create create clipper (hr:0x%x)\n", hr);
-	 pDD->Release();
-
-	 return -1;
-	}
-
- 
-
-	hr = lpClipper->SetHWnd(0, hWnd);
-
-	if (hr != DD_OK)
-	{
-	 printf("failed to clippter sethwnd (hr:0x%x)\n", hr);
-	 lpClipper->Release();
-	 lpPrimary->Release();
-	 pDD->Release();
-
-	 return -1;
-	}
-	
-
-	hr = lpPrimary->SetClipper(lpClipper);
-
-	if (hr != DD_OK)
-	{
-	 printf("failed to set clipper (hr:0x%x)\n", hr);
-	 lpClipper->Release();
-	 lpPrimary->Release();
-	 pDD->Release();
-
-	 return -1;
-	}
-
-
-	/* creating yuv420 surface */
-	ZeroMemory(&ddsd, sizeof(ddsd));
-	ddsd.dwSize   = sizeof(ddsd);
-	ddsd.dwFlags  = DDSD_CAPS | DDSD_WIDTH | DDSD_HEIGHT | DDSD_PIXELFORMAT;
-	ddsd.ddsCaps.dwCaps = DDSCAPS_OFFSCREENPLAIN;
-	ddsd.dwWidth  = width;
-	ddsd.dwHeight  = height;
-
-
-	memcpy(&ddsd.ddpfPixelFormat, &g_ddpfFormats[0], sizeof(DDPIXELFORMAT)); // IMPORTANT
-
-
-
-
-
-	if ((hr=pDD->CreateSurface(&ddsd, &lpYUVBuffer, NULL)) != DD_OK)
-	{
-		  printf("failed to create yuv buffer surface\n");
-		  return -1;
-	}
-
-
-	return true;
-
-}
-int CDDMain::draw(RECT *rectTarget, AVFrame *pPicture){
-	HRESULT hr;
-
-	int w = g_width; //À§ÀÇ inidraw ¿¡¼­ g_width °ªÀ» Áı¾î ³Ö¾ú¾úÀ½.
-	int h = g_height;
-
-
-	DDSURFACEDESC2 ddsd; //
-	ZeroMemory(&ddsd, sizeof(ddsd)); //&ddsdÀÇ ¸Ş¸ğ¸® Æ÷ÀÎÅÍ·ÎºÎÅÍ ddsdÀÇ »çÀÌÁî¸¸Å­ ¸Ş¸ğ¸® ÃÊ±âÈ­.
-	ddsd.dwSize = sizeof(ddsd);
-
-	// À§ÀÇ ÀÏ·ÃÀÇ ¼¼ ÀÛ¾÷Àº ÇÑ²¨¹ø¿¡ ÇØ ÁÖ¾î¾ß ÇÔ. http://blog.naver.com/kor31/90004643576
-	// DDSURFACEDESC2 ÀÇ ¼³¸íÀÌ ³ª¿ÍÀÖÀ½.
-
-
-
-
-		//¶ôÀ»°ÉÀº´ÙÀ½ »óÅÂ¸¦ hr¿¡ ³Ö°í ±× »óÅÂ°¡ DD_OKÀÎ°æ¿ì ½ÇÇà.¤»¤» ±×·³ ÇÑ ÇÁ·¹ÀÓ¸¶´Ù ½ÇÇàµÉ ¼ö ¹Û¿¡ ¾ø°Ú±¸³ª
-	if ((hr = lpYUVBuffer->Lock(NULL, &ddsd, DDLOCK_SURFACEMEMORYPTR | DDLOCK_WAIT, NULL)) == DD_OK) //¿©±â¼­ ddsd¿¡ °¢Á¾ º¯¼öµéÀÌ µé¾î°¡Áü
-	{
-	 LPBYTE lpSurf = (LPBYTE)ddsd.lpSurface;  
-    
-	 LPBYTE ptr = lpSurf;
-	 //ddsd.lPitch = 416; //?????????????? ¿Ö 512·Î µÇ¾îÀÖ³Ä ÀÌ°Ô ¹¹°¡ ÀÖ´Âµí ¾Æ´Ï ÀÌ°Ô ¸ÂÀ½ ¤»¤»¤»¤»¤»¤»¤»¤»¤»¤»¤»¤»¤»¤»¤»¤»¤»¤»¤» ¿Í´ë¹Ú ¿ÖÀÌ·¸Áö
-
- 
-
-	 int t_stride = pPicture->linesize[0];
-	 int i;
- 
-	 for (i=0; i < h; i++) {
-	  memcpy(ptr + i*ddsd.lPitch, pPicture->data[0] + i*t_stride, w);
-	 }
-
-	 ptr += ddsd.lPitch*h;
- 
-	 for (i=0; i < h/2; i++) {
-		memcpy(ptr + i*ddsd.lPitch/2, pPicture->data[2] + i*t_stride/2, w/2);
-	 }
- 
-	 ptr += ddsd.lPitch*h/4;
- 
-	 for (i=0; i < h/2; i++) {
-		memcpy(ptr + i*ddsd.lPitch/2, pPicture->data[1]+i*t_stride/2, w/2);
-	 }
-
-	 //À§¿¡¼­ YUV¸¦ ÇÑÀå ¹Ş°í UnlockÇØÁÖ°í ÇÏ´Âµí. ¹öÆÛ¿¡ ÀÖ´Âµ¿¾ÈÀº °è¼Ó µ¹°ÚÁö
-
-		lpYUVBuffer->Unlock(NULL);
-		//1. YUV¹öÆÛ¿¡ UnlockÀ» ÇØ ½×¾ÆÁØ ´ÙÀ½
-	}
-
-		RECT rectSrc;
-		rectSrc.top = 0;
-		rectSrc.left = 0;
-		rectSrc.right = w;
-		rectSrc.bottom = h;
-
-
-		//2. IpPrimary ¹öÆÛ¿¡ Blt·Î »Ñ·ÁÁØ´Ù.
-		hr = lpPrimary->Blt(rectTarget, lpYUVBuffer, &rectSrc, DDBLT_ASYNC, NULL);
-
-		return TRUE;
-}
-void CDDMain::DelObjects(){
-	//º¸Á¶Ç¥¸é »èÁ¦
-    if( lpYUVBuffer )
-    {
-        lpYUVBuffer->Release();
-        lpYUVBuffer = NULL ;
-    }
-    //ÁÖÇ¥¸é »èÁ¦
-    if( lpPrimary )
-    {
-        lpPrimary->Release();
-        lpPrimary = NULL ;
-     }
-    //DirectDraw °´Ã¼ ÇØÁ¦
-    if(pDD)
-    {
-         pDD->Release();
-         pDD = NULL ;
-    }
-}
-int CDDMain::YUVLoad(AVFrame *YUVdata){
-	 fstream fp;
-	 fstream fpw;
-	 //¼öÁ¤ 10bit 
-
-		 //fp.open("rec.yuv" , ios::in | ios::binary);
-		 //fp.open("E:\\SteamLocomotiveTrain_2560x1600_60_10bit_crop.yuv" , ios::in | ios::binary);
-		 fp.open("SteamLocomotiveTrain_2560x1600_60_10bit_crop.yuv" , ios::in | ios::binary);
-		 //Ã·ºÎ ¿µ»ó È°¿ë
-
-		if(fp.fail()){
-			//MessageBox(hWnd, "YUV ÆÄÀÏÀĞ±â ½ÇÆĞ", "ERROR", MB_OK );
-			 return FALSE;
-		 }
-
-
-#if IS10BIT == FALSE
-		 
-
-			 fp.seekg(FilePointer); //FilePointer´Â 0À¸·Î ÃÊ±âÈ­ µÇ¾îÀÖÀ½.
-		 
-			 fp.read((char *)YUVdata->data[0], WIDTH*HEIGHT );
-			 fp.read((char *)YUVdata->data[1], WIDTH*HEIGHT / 4 );
-			 fp.read((char *)YUVdata->data[2], WIDTH*HEIGHT / 4 );
-
-			 FilePointer = (int)fp.tellg();
-			 fp.close();
-
-		 
-
-#elif IS10BIT == TRUE
 
 		fpw.open("out10to8bit.yuv", ios::out | ios::app | ios::binary);
 
 		if (fpw.fail()) {
-			//MessageBox(hWnd, "YUV ÆÄÀÏÀĞ±â ½ÇÆĞ", "ERROR", MB_OK );
+			//MessageBox(hWnd, "YUV íŒŒì¼ì½ê¸° ì‹¤íŒ¨", "ERROR", MB_OK );
 			return FALSE;
 		}
 		
-			 fp.seekg(FilePointer); //FilePointer´Â 0À¸·Î ÃÊ±âÈ­ µÇ¾îÀÖÀ½.
+			 fp.seekg(FilePointer); //FilePointerëŠ” 0ìœ¼ë¡œ ì´ˆê¸°í™” ë˜ì–´ìˆìŒ.
 		 
 			 fp.read((char *)tempAVFrame->data[0], WIDTH*HEIGHT * 2 );
 			 fp.read((char *)tempAVFrame->data[1], WIDTH*HEIGHT / 4 * 2 );
 			 fp.read((char *)tempAVFrame->data[2], WIDTH*HEIGHT / 4 * 2 );
-			 //YUV420 10bit´Â 10ºñÆ®°¡ ¿¬¼ÓÀ¸·Î ÀÖ´Â°Ô ¾Æ´Ï¶ó, °ü¸®¸¦ ÆíÇÏ°Ô ÇÏ±â À§ÇØ 2¹ÙÀÌÆ®, Áï 16ºñÆ®¸¦ ÀĞ¾î ¿Í¾ßÇØ.
-			 //±×·¡¼­ ¹è¿­ ¼±¾ğ ÇØÁÙ ¶§ Å©±â¸¦ Á¾Àü(8bit)ÀÇ 2¹è¸¦ ÇØ ÁÖ¾î¾ß ÇÏÁö. ±×·¸°Ô ÀĞ¾î¿Â ºñÆ®µéÀÇ ¹è¿­Àº ´ÙÀ½°ú °°¾Æ
-			 // 1-> À¯È¿ºñÆ® / 0-> ÇÊ¿ä¾ø´Â ºñÆ®
+			 //YUV420 10bitëŠ” 10ë¹„íŠ¸ê°€ ì—°ì†ìœ¼ë¡œ ìˆëŠ”ê²Œ ì•„ë‹ˆë¼, ê´€ë¦¬ë¥¼ í¸í•˜ê²Œ í•˜ê¸° ìœ„í•´ 2ë°”ì´íŠ¸, ì¦‰ 16ë¹„íŠ¸ë¥¼ ì½ì–´ ì™€ì•¼í•´.
+			 //ê·¸ë˜ì„œ ë°°ì—´ ì„ ì–¸ í•´ì¤„ ë•Œ í¬ê¸°ë¥¼ ì¢…ì „(8bit)ì˜ 2ë°°ë¥¼ í•´ ì£¼ì–´ì•¼ í•˜ì§€. ê·¸ë ‡ê²Œ ì½ì–´ì˜¨ ë¹„íŠ¸ë“¤ì˜ ë°°ì—´ì€ ë‹¤ìŒê³¼ ê°™ì•„
+			 // 1-> ìœ íš¨ë¹„íŠ¸ / 0-> í•„ìš”ì—†ëŠ” ë¹„íŠ¸
 			 // 1111 1111  0000 0011
-			 // ¹è¿­ 1	  ¹è¿­ 2
-			 // ±×·±µ¥, ¿©±â¼­ YUV420 8ºñÆ®·Î ÀüÈ¯ÇÒ ¶§ ¾µ¸ğÀÖ´Â ºñÆ®´Â ´ÙÀ½°ú °°¾Æ.
+			 // ë°°ì—´ 1	  ë°°ì—´ 2
+			 // ê·¸ëŸ°ë°, ì—¬ê¸°ì„œ YUV420 8ë¹„íŠ¸ë¡œ ì „í™˜í•  ë•Œ ì“¸ëª¨ìˆëŠ” ë¹„íŠ¸ëŠ” ë‹¤ìŒê³¼ ê°™ì•„.
 			 // 1111 1100  0000 0011
 			 
-			 // ¿©±â¼­ ¶Ç, ¹è¿­ 1°ú ¹è¿­ 2¸¦ ¼­·Î µÚ¹Ù²ã ÁØ µÚ, 
+			 // ì—¬ê¸°ì„œ ë˜, ë°°ì—´ 1ê³¼ ë°°ì—´ 2ë¥¼ ì„œë¡œ ë’¤ë°”ê¿” ì¤€ ë’¤, 
 			 // 0000 0011  1111 1100
 
-			 // ½¬ÇÁÆ® ¿ŞÂÊÀ¸·Î ¿©¼¸¹øÀ» ÇÏ¸é ¿øÇÏ´Â ºñÆ®°¡ ³ª¿ÀÁö.
+			 // ì‰¬í”„íŠ¸ ì™¼ìª½ìœ¼ë¡œ ì—¬ì„¯ë²ˆì„ í•˜ë©´ ì›í•˜ëŠ” ë¹„íŠ¸ê°€ ë‚˜ì˜¤ì§€.
 			 // 1111 1111  0000 0000
 
-			 // ±Ùµ¥ ÀÌ·¸°Ô ÇÏ¸é ¹ø°Å·Î¿ì´Ï, ¹è¿­ 1¹ø¿¡¼­ ¾Õ¿¡ÀÖ´Â ¿©¼¸ºñÆ®¸¸ µû¼­ µÎ°³ µÚ·Î º¸³½ µÚ( >> 2 )¿¡ ±× ºñÆ®µé°ú,
-			 // ¹è¿­ 2¹ø¿¡¼­ µÚ¿¡ÀÖ´Â µÎ ºñÆ®¸¸ µû¼­ ¸Ç ¾ÕÀ¸·Î º¸³½ µÚ( << 6 )¿¡
-			 // ±× ¹è¿­ µÎ°³¸¦ OR ( | ) ·Î ÇÕÄ¡¸é ¿ì¸®°¡ ¿øÇÏ´Â Àß¸° 2 ºñÆ®°¡ ¿Ï¼ºÀÌ µÅ.
+			 // ê·¼ë° ì´ë ‡ê²Œ í•˜ë©´ ë²ˆê±°ë¡œìš°ë‹ˆ, ë°°ì—´ 1ë²ˆì—ì„œ ì•ì—ìˆëŠ” ì—¬ì„¯ë¹„íŠ¸ë§Œ ë”°ì„œ ë‘ê°œ ë’¤ë¡œ ë³´ë‚¸ ë’¤( >> 2 )ì— ê·¸ ë¹„íŠ¸ë“¤ê³¼,
+			 // ë°°ì—´ 2ë²ˆì—ì„œ ë’¤ì—ìˆëŠ” ë‘ ë¹„íŠ¸ë§Œ ë”°ì„œ ë§¨ ì•ìœ¼ë¡œ ë³´ë‚¸ ë’¤( << 6 )ì—
+			 // ê·¸ ë°°ì—´ ë‘ê°œë¥¼ OR ( | ) ë¡œ í•©ì¹˜ë©´ ìš°ë¦¬ê°€ ì›í•˜ëŠ” ì˜ë¦° 2 ë¹„íŠ¸ê°€ ì™„ì„±ì´ ë¼.
 
-			 // ±× ¹Ø¿¡ ÄÚµå°¡ ÀÖ¾î.
+			 // ê·¸ ë°‘ì— ì½”ë“œê°€ ìˆì–´.
 
 			 FilePointer = (int)fp.tellg();
 			 fp.close();
@@ -408,7 +80,7 @@ int CDDMain::YUVLoad(AVFrame *YUVdata){
 
 #endif
 
-		//¼öÁ¤ 10bit ³¡
+		//ìˆ˜ì • 10bit ë
 
 		 YUVdata->linesize[0] = WIDTH;		//t_stride
 		 YUVdata->linesize[1] = WIDTH / 2;
@@ -417,122 +89,5 @@ int CDDMain::YUVLoad(AVFrame *YUVdata){
 		 Frame++;
 
 		 return TRUE;
-}
-void CDDMain::YUVDel(AVFrame *YUVdata){
-	delete [](YUVdata->data[0]);
-	delete [](YUVdata->data[1]);
-	delete [](YUVdata->data[2]);
-
-	delete [](YUVdata);
-}
-
-AVFrame* YUVCreate(AVFrame *YUVdata){
-	 YUVdata = new AVFrame;
-	 
-	 YUVdata->data[0] = new UCHAR[WIDTH*HEIGHT];		//Y
-	 YUVdata->data[1] = new UCHAR[WIDTH*HEIGHT/4];	//U 
-	 YUVdata->data[2] = new UCHAR[WIDTH*HEIGHT/4];	//V  
-
-	return YUVdata;
-}
-
-
-
-int APIENTRY WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
-
-	CDDMain DClass;
-	
-	//ms_code ¼öÁ¤ ÇÊ¿äÇÔ ³ªÁß¿¡ ¾Æ¿¹ ÃÊ±âÈ­¸¦ ½ÃÄÑÁà¾ß ÇÏÁö ¾Ê³ª ½ÍÀ½
-		 YUVdata = YUVCreate(YUVdata);
-		 SetRect(&rectTarget, 0, 0, WIDTH, HEIGHT);
-
-
-	//ms_code ³¡
-
-  HWND hWnd;						//ÇÚµéÀ» hWnd¿¡ ´ãÀ½
-  WNDCLASS WndClass;				
- 
-  //À©µµ¿ì Å¬·¡½º ±¸Á¶Ã¼¿¡ °ª ÀÔ·Â
-  WndClass.cbClsExtra         = 0;										// À©µµ¿ì Å¬·¡½º¿¡¼­ »ç¿ëÇÏ°íÀÚ ÇÏ´Â ¿©ºĞ ¸Ş¸ğ¸®¾ç ÁöÁ¤
-  WndClass.cbWndExtra         = 0;										// °³º°À©µµ¿ì¿¡¼­ »ç¿ëÇÏ°íÀÚ ÇÏ´Â ¸Ş¸ğ¸®¾ç ÁöÁ¤ -> °³º°À©µµ¿ì »ı¼º½Ã¸¶´Ù ¸Ş¸ğ¸®¸¦ Ãß°¡ÀûÀ¸·Î ÇÒ´ç¹ŞÀ½
-  WndClass.hbrBackground	  = (HBRUSH)GetStockObject(BLACK_BRUSH);	// À©µµ¿ìÀÇ ÀÛ¾÷¿µ¿ª¿¡ Ä¥ÇÒ ¹è°æ ºê·¯½Ã ÁöÁ¤
-  WndClass.hCursor            = LoadCursor(NULL, IDC_ARROW);			// À©µµ¿ì ÀÛ¾÷ ¿µ¿ª¿¡ ¸¶¿ì½º°¡ À§Ä¡ÇØ ÀÖÀ¸ ¶§ »ç¿ëµÉ Ä¿¼­ ÁöÁ¤
-  WndClass.hIcon              = LoadIcon(NULL, IDI_APPLICATION);		// À©µµ¿ì°¡ ÃÖ¼ÒÈ­ µÇ¾úÀ» ¶§ º¸¿©ÁÙ ¾ÆÀÌÄÜ
-  WndClass.hInstance          = hInstance;								// À©µµ¿ì Å¬·¡½º¸¦ µî·ÏÇÑ ÀÀ¿ë ÇÁ·Î±×·¥ÀÇ ÀÎ½ºÅÏ½º ÇÚµé
-  WndClass.lpfnWndProc        = (WNDPROC)WndProc;						// ¸Ş½ÃÁö Ã³¸®ÇÔ¼ö ÁöÁ¤
-  WndClass.lpszClassName	  = DClass.lpClassName;							// µî·ÏÇÏ°íÀÚ ÇÏ´Â À©µµ¿ì Å¬·¡½ºÀÇ ÀÌ¸§À» ³ªÅ¸³»´Â ¹®ÀÚ¿­
-  WndClass.lpszMenuName		  = NULL;									// À©µµ¿ì°¡ »ç¿ëÇÒ ¸Ş´º ÁöÁ¤(Createwindow¿¡¼­ º°µµ ÁöÁ¤½Ã ¹«½ÃµÊ)
-  WndClass.style              = CS_HREDRAW | CS_VREDRAW;				// À©µµ¿ì ½ºÅ¸ÀÏ.(CreateWindow¿¡¼­ ÁöÁ¤ÇÏ´Â °³º° À©µµ¿ì ½ºÅ¸ÀÏ°ú ´Ù¸§)
-
-  //À©µµ¿ì Å¬·¡½º µî·Ï
-  RegisterClass(&WndClass);
- 
-  //°³º°À©µµ¿ì »ı¼º (ÀÌ°É ¸ŞÀÎ ÇÚµé·Î »ç¿ëÇÏ´Âµí)
-  hWnd = CreateWindowA(DClass.lpClassName,DClass.lpClassName, WS_BORDER | WS_SYSMENU | WS_VISIBLE | WS_THICKFRAME ,
-                                   0, 0, WIDTH, HEIGHT, NULL, NULL, hInstance, NULL);
-  
-
-  if(hWnd == NULL)  return 0;		//ÀÀ ±×Ä¡ ÇÚµéÀÌ ¾Èµé¾î°¬À¸¸é ¹ö·Á¾ßÁö
- 
-
-  ShowWindow(hWnd, nCmdShow);		
- 
-
-  if( DClass.initDraw(hWnd, WIDTH, HEIGHT) != TRUE )
-  {
-      MessageBox(hWnd, "YUV ½ºÅ©¸° »ı¼º  ½ÇÆĞ", "ERROR", MB_OK );
-      return 0;
-  }
-  
-
-  //¼öÁ¤ framerate
-  //LARGE_INTEGER -> union ÇÏ¿©¼­ ¿©·¯ Á¤¼ö¸¦ ¹­¾î¼­ Å©±â¸¦ ´À·ÁÁØ ¼ö. ¾à 5¸¸³âÀÇ ½Ã°£À» ÀúÀå °¡´É
-  // ±âº»ÀûÀ¸·Î Áö±İ À§¿¡ »ç¿ëÇÏ°í ÀÖ´Â Çì´õ¿¡¼­ Áö¿øÇØ ÁÖ´Â ¼ö
-  LARGE_INTEGER startingTime, endingTime;
-  LARGE_INTEGER frequency;
-  float diffTime = 100.0;//ÀÌ °ªÀÌ ¹«Á¶°Ç 1/frameRate º¸´Ù ´õ Ä¿¾ßÇÑ´Ù. ±×·¡¾ß ¹İº¹¹®ÀÌ µ¹°Ô µÊ.
-  float frameRate = 30.0;
-  
-  QueryPerformanceFrequency(&frequency);//ÁÖÆÄ¼ö ¹Ş¾Æ¿À±â.
-  // ¿ø·¡´Â »ç¿ëÇÏ·Á¸é winmm.lib¸¦ ¹Ş¾Æ¿Í¾ß »ç¿ë °¡´ÉÇÏ´Ù°í ÇÔ(pragma È°¿ë). À©µµ¿ì Çì´õ¿¡ ÀÖ³ª? 
-  // frequency´Â CPUÀÇ Å¬·ÏÀÇ ¼Óµµ°¡ µÇ´Âµ¥(CPUÀÇ ÁÖÆÄ¼ö ÀÖÀİ¾Æ ¸î¸î Hz ±×°Å.), 
-  // (³¡¿¡ÃøÁ¤ÇÑÅ¬·Ï - ½ÃÀÛÃøÁ¤ÇÑÅ¬·Ï) / Å¬·Ï
-  // ...À» ÇÏ¸é, ½Ã°£´ÜÀ§°¡ ´Ù ¾àºĞµÇ¾î¼­ ´õ Á¤¹ĞÇÑ ½Ã°£Â÷°¡ (second) ·Î ³ª¿À°Ô µÇ¾îÁ®.
-  // µ¿ÀÛ ¹æ½ÄÀÌ Å¬·°ÀÌ µ¹¸é Á÷Á¢ ÃøÁ¤ÇÏ´Â°Ô ¾Æ´Ï¶ó, ¾Æ¿¹ OS¿¡¼­ Áö¿øÇØÁÖ´Â Å¬·°À» ´ã°Ô µÇ¾î
-  // ÀÌº¸´Ù ´õ Á¤¹ĞÇÒ ¼ö ¾ø´Â ÃøÁ¤ ½Ã°£Â÷°¡ ³ª¿Â´ë. ´Ù¸¸ ´ã´Â ¼ö°¡ ³Ê¹« ¹æ´ëÇÏ´Ùº¸´Ï(64bits) 
-  // Àß¸øÇÏ¸é ºÎÈ£°¡ ÀÖ´Â 31+1 bit ¼ö·Î ÀĞÀ» ¼ö ÀÖ±â ¶§¹®¿¡ 64ºñÆ®¸¦ ÀüºÎ »ç¿ëÀ» ÇÏµµ·Ï ¸¸µé¾î¾ß ÇØ.
-  // ÇØ´ç LARGE_INTEGERÀÇ ¸â¹ö Áß, QUADPARTÀÇ ¸â¹ö¸¦ »ç¿ëÇÏ¸é µÈ´Ù°í ÃßÃøµÇ¾î Á®. (ÃßÃø)
-
-
-  MSG  msg;
-
-  while(1)
-  {
-     if( PeekMessage(&msg, NULL, 0, 0, PM_REMOVE) )
-     {
-        if(msg.message == WM_QUIT)
-            break;
-        
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
-     }
-
-	 //¼öÁ¤ FrameRate
-	 if(Frame < FRAME && (float)diffTime >= 1/frameRate ) { 
-		
-		 DClass.YUVLoad(YUVdata);
-		 QueryPerformanceCounter(&startingTime); 
-	 }
-	 DClass.draw(&rectTarget, YUVdata); 
-	 QueryPerformanceCounter(&endingTime);
-	 diffTime = (float)(endingTime.QuadPart - startingTime.QuadPart) / frequency.QuadPart; //Surface¿¡ drawÇÏ°í ¹Ù·Î FirstTime°ú Â÷ÀÌ³ª´Â ½Ã°£À» ¹Ş¾Æ¿Â´Ù. ÀÌ ½Ã°£Àº s ´ÜÀ§ÀÌ´Ù. s * 1000 ÇÏ¸é 
-	 //¼öÁ¤ FrameRate ³¡
-	// ±¸µµ´Â °ÅÀÇ ºñ½ÁÇÏÁö?
-   }
-
-   DClass.DelObjects();
-   DClass.YUVDel(YUVdata);
- 
- return msg.wParam;
 
 }
